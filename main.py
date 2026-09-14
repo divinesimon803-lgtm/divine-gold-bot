@@ -2,20 +2,21 @@ import websocket
 import json
 import threading
 import time
+import random
 from flask import Flask
 
 app = Flask(__name__)
 
 @app.route('/')
 def home():
-    return "Divine Gold APA Trading Bot is active!"
+    return "Divine Gold Dynamic APA Bot is active!"
 
 def run_web():
     app.run(host='0.0.0.0', port=10000)
 
 API_TOKEN = "pat_9ea5fd57fa2cfc960e7c30d0f7a737d559dc6dc258dcf572d32bae26999092e8"
 APP_ID = "1089" 
-SYMBOL = "frxXAUUSD"
+SYMBOL = "frxXAUUSD" # Enforcing Gold explicitly
 
 last_trade_time = 0
 
@@ -30,64 +31,58 @@ def on_message(ws, message):
     msg_type = data.get("msg_type")
     
     if msg_type == "authorize":
-        print("Authorization Successful! Requesting trade proposal with correct platform...")
-        proposal_request = {
-            "proposal": 1,
-            "amount": 1,
-            "basis": "stake",
-            "contract_type": "MULTUP",
-            "currency": "USD",
-            "symbol": SYMBOL,
-            "multiplier": 50,
-            "passthrough": {"platform": "deriv_trader"},
-            "limit_order": {
-                "stop_loss": 0.50,
-                "take_profit": 1.00
-            }
-        }
-        ws.send(json.dumps(proposal_request))
+        print("Authorization Successful! Locking onto Gold (XAUUSD)...")
         ws.send(json.dumps({"ticks": SYMBOL}))
         
-    elif msg_type == "proposal":
-        if "proposal" in data:
-            proposal_id = data["proposal"]["id"]
-            print(f"Received Proposal ID: {proposal_id}. Executing live trade...")
-            
-            buy_request = {
-                "buy": proposal_id,
-                "price": 2
-            }
-            ws.send(json.dumps(buy_request))
-        else:
-            print(f"Proposal Details / Error: {data}")
-            
     elif msg_type == "tick":
         quote = data["tick"]["quote"]
         print(f"Live Gold Price: {quote}")
         
+        # Every 30 seconds, evaluate for a trade with dynamic variable sizing
         current_time = time.time()
         if current_time - last_trade_time > 30:
+            
+            # --- DYNAMIC "TEARING" LOT / STAKE SIZING ---
+            # Simulate setup strength: normal setup = $1 stake, premium setup = $2 or $3 stake
+            chosen_stake = random.choice([1, 2, 3]) 
+            chosen_multiplier = 50 if chosen_stake == 1 else 100 # Higher leverage for bigger setups
+            
+            print(f"Evaluating Gold setup... Dynamic Stake chosen: ${chosen_stake} with {chosen_multiplier}x multiplier.")
+            
             proposal_request = {
                 "proposal": 1,
-                "amount": 1,
+                "amount": chosen_stake,
                 "basis": "stake",
                 "contract_type": "MULTUP",
                 "currency": "USD",
                 "symbol": SYMBOL,
-                "multiplier": 50,
-                "passthrough": {"platform": "deriv_trader"},
+                "multiplier": chosen_multiplier,
                 "limit_order": {
-                    "stop_loss": 0.50,
-                    "take_profit": 1.00
+                    "stop_loss": round(chosen_stake * 0.5, 2),   # Scaled Stop Loss
+                    "take_profit": round(chosen_stake * 1.0, 2)  # Scaled Take Profit
                 }
             }
             ws.send(json.dumps(proposal_request))
             last_trade_time = current_time
-
+            
+    elif msg_type == "proposal":
+        if "proposal" in data:
+            proposal_id = data["proposal"]["id"]
+            payout = data["proposal"]["ask_price"]
+            print(f"Gold Proposal ID received: {proposal_id} (Cost: {payout}). Executing order...")
+            
+            buy_request = {
+                "buy": proposal_id,
+                "price": float(payout) + 1
+            }
+            ws.send(json.dumps(buy_request))
+        else:
+            print(f"Proposal Notice: {data.get('error', {}).get('message', data)}")
+            
     elif msg_type == "buy":
         if "buy" in data:
             contract_id = data["buy"]["contract_id"]
-            print(f"SUCCESS! Live trade opened! Contract ID: {contract_id}")
+            print(f"SUCCESS! Gold trade opened! Contract ID: {contract_id}")
         elif "error" in data:
             print(f"Trade Execution Error: {data['error']['message']}")
 
