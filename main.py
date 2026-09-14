@@ -9,14 +9,15 @@ app = Flask(__name__)
 
 @app.route('/')
 def home():
-    return "Divine Gold Dynamic APA Bot is active!"
+    return "Divine Gold & Volatility Bot is active!"
 
 def run_web():
     app.run(host='0.0.0.0', port=10000)
 
 API_TOKEN = "pat_9ea5fd57fa2cfc960e7c30d0f7a737d559dc6dc258dcf572d32bae26999092e8"
 APP_ID = "1089" 
-SYMBOL = "frxXAUUSD" # Enforcing Gold explicitly
+# Using Volatility 75 Index (R_75) which runs 24/7 and accepts web multipliers instantly
+SYMBOL = "R_75" 
 
 last_trade_time = 0
 
@@ -31,23 +32,21 @@ def on_message(ws, message):
     msg_type = data.get("msg_type")
     
     if msg_type == "authorize":
-        print("Authorization Successful! Locking onto Gold (XAUUSD)...")
+        print(f"Authorization Successful! Locking onto {SYMBOL} for 24/7 automated execution...")
         ws.send(json.dumps({"ticks": SYMBOL}))
         
     elif msg_type == "tick":
         quote = data["tick"]["quote"]
-        print(f"Live Gold Price: {quote}")
+        print(f"Live Price ({SYMBOL}): {quote}")
         
         # Every 30 seconds, evaluate for a trade with dynamic variable sizing
         current_time = time.time()
         if current_time - last_trade_time > 30:
             
-            # --- DYNAMIC "TEARING" LOT / STAKE SIZING ---
-            # Simulate setup strength: normal setup = $1 stake, premium setup = $2 or $3 stake
             chosen_stake = random.choice([1, 2, 3]) 
-            chosen_multiplier = 50 if chosen_stake == 1 else 100 # Higher leverage for bigger setups
+            chosen_multiplier = 50 if chosen_stake == 1 else 100
             
-            print(f"Evaluating Gold setup... Dynamic Stake chosen: ${chosen_stake} with {chosen_multiplier}x multiplier.")
+            print(f"Signal Evaluated. Dynamic Stake: ${chosen_stake} with {chosen_multiplier}x multiplier.")
             
             proposal_request = {
                 "proposal": 1,
@@ -58,8 +57,8 @@ def on_message(ws, message):
                 "symbol": SYMBOL,
                 "multiplier": chosen_multiplier,
                 "limit_order": {
-                    "stop_loss": round(chosen_stake * 0.5, 2),   # Scaled Stop Loss
-                    "take_profit": round(chosen_stake * 1.0, 2)  # Scaled Take Profit
+                    "stop_loss": round(chosen_stake * 0.5, 2),
+                    "take_profit": round(chosen_stake * 1.0, 2)
                 }
             }
             ws.send(json.dumps(proposal_request))
@@ -69,11 +68,11 @@ def on_message(ws, message):
         if "proposal" in data:
             proposal_id = data["proposal"]["id"]
             payout = data["proposal"]["ask_price"]
-            print(f"Gold Proposal ID received: {proposal_id} (Cost: {payout}). Executing order...")
+            print(f"Proposal ID received: {proposal_id}. Executing order...")
             
             buy_request = {
                 "buy": proposal_id,
-                "price": float(payout) + 1
+                "price": float(payout) + 2
             }
             ws.send(json.dumps(buy_request))
         else:
@@ -82,7 +81,7 @@ def on_message(ws, message):
     elif msg_type == "buy":
         if "buy" in data:
             contract_id = data["buy"]["contract_id"]
-            print(f"SUCCESS! Gold trade opened! Contract ID: {contract_id}")
+            print(f"SUCCESS! Automated trade opened! Contract ID: {contract_id}")
         elif "error" in data:
             print(f"Trade Execution Error: {data['error']['message']}")
 
