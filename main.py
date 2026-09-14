@@ -17,12 +17,9 @@ API_TOKEN = "pat_9ea5fd57fa2cfc960e7c30d0f7a737d559dc6dc258dcf572d32bae26999092e
 APP_ID = "1089" 
 SYMBOL = "frxXAUUSD"
 
-ws_global = None
 last_trade_time = 0
 
 def on_open(ws):
-    global ws_global
-    ws_global = ws
     print("Connected to Deriv API successfully!")
     auth_data = {"authorize": API_TOKEN}
     ws.send(json.dumps(auth_data))
@@ -34,7 +31,6 @@ def on_message(ws, message):
     
     if msg_type == "authorize":
         print("Authorization Successful! Requesting trade proposal for Gold...")
-        # Request a proposal first (Deriv standard procedure)
         proposal_request = {
             "proposal": 1,
             "amount": 1,
@@ -54,9 +50,8 @@ def on_message(ws, message):
     elif msg_type == "proposal":
         if "proposal" in data:
             proposal_id = data["proposal"]["id"]
-            print(عf"Received Proposal ID: {proposal_id}. Buying contract now...")
+            print(f"Received Proposal ID: {proposal_id}. Buying contract now...")
             
-            # Buy using the proposal ID
             buy_request = {
                 "buy": proposal_id,
                 "price": 2
@@ -69,7 +64,6 @@ def on_message(ws, message):
         quote = data["tick"]["quote"]
         print(f"Live Gold Price: {quote}")
         
-        # Every 30 seconds, request a new proposal to keep executing trades
         current_time = time.time()
         if current_time - last_trade_time > 30:
             proposal_request = {
