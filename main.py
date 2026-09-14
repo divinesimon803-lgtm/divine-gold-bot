@@ -30,7 +30,7 @@ def on_message(ws, message):
     msg_type = data.get("msg_type")
     
     if msg_type == "authorize":
-        print("Authorization Successful! Requesting trade proposal for Gold...")
+        print("Authorization Successful! Requesting trade proposal with correct platform...")
         proposal_request = {
             "proposal": 1,
             "amount": 1,
@@ -39,6 +39,7 @@ def on_message(ws, message):
             "currency": "USD",
             "symbol": SYMBOL,
             "multiplier": 50,
+            "passthrough": {"platform": "deriv_trader"},
             "limit_order": {
                 "stop_loss": 0.50,
                 "take_profit": 1.00
@@ -50,7 +51,7 @@ def on_message(ws, message):
     elif msg_type == "proposal":
         if "proposal" in data:
             proposal_id = data["proposal"]["id"]
-            print(f"Received Proposal ID: {proposal_id}. Buying contract now...")
+            print(f"Received Proposal ID: {proposal_id}. Executing live trade...")
             
             buy_request = {
                 "buy": proposal_id,
@@ -58,7 +59,7 @@ def on_message(ws, message):
             }
             ws.send(json.dumps(buy_request))
         else:
-            print(f"Proposal Error: {data}")
+            print(f"Proposal Details / Error: {data}")
             
     elif msg_type == "tick":
         quote = data["tick"]["quote"]
@@ -74,6 +75,7 @@ def on_message(ws, message):
                 "currency": "USD",
                 "symbol": SYMBOL,
                 "multiplier": 50,
+                "passthrough": {"platform": "deriv_trader"},
                 "limit_order": {
                     "stop_loss": 0.50,
                     "take_profit": 1.00
