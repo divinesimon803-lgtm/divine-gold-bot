@@ -10,7 +10,7 @@ app = Flask(__name__)
 
 @app.route('/')
 def home():
-    return "Divine Synthetic 24/7 Matrix Bot is active!"
+    return "Divine Multi-Stream Matrix Bot is active!"
 
 def run_web():
     port = int(os.environ.get("PORT", 10000))
@@ -28,35 +28,24 @@ async def trade_worker(symbol):
     while True:
         try:
             async with websockets.connect(ws_url) as ws:
-                auth_payload = {"authorize": API_TOKEN}
+                auth_payload = {"authorize": API_TOKEN, "req_id": random.randint(1, 1000)}
                 await ws.send(json.dumps(auth_payload))
                 await ws.recv()
                 
-                print(f"[{symbol}] Connected & Authorized. Scanning synthetic volatility...")
-                await ws.send(json.dumps({"ticks": symbol}))
+                print(f"[{symbol}] Connected & Authorized. Ready for multi-queue execution...")
+                await ws.send(json.dumps({"ticks": symbol, "req_id": random.randint(1001, 2000)}))
                 
                 async for message in ws:
                     data = json.loads(message)
                     msg_type = data.get("msg_type")
                     
                     if msg_type == "tick":
-                        tick_data = data.get("tick", {})
-                        current_price = tick_data.get("quote")
-                        
-                        # Emergency spike check
-                        for cid, entry_price in list(active_contracts.items()):
-                            if abs(current_price - entry_price) > (entry_price * 0.005):
-                                print(f"[{symbol}] Spike detected, cutting contract {cid} early.")
-                                close_request = {"sell": cid, "price": 0}
-                                await ws.send(json.dumps(close_request))
-                                del active_contracts[cid]
-
-                        # Frequent entry trigger for multi-positions
-                        if random.random() < 0.45 and len(active_contracts) < 4:
+                        # Fire independent multi-market entry requests
+                        if random.random() < 0.5 and len(active_contracts) < 3:
                             chosen_stake = random.choice([1, 2, 3])
                             chosen_multiplier = 50 if chosen_stake == 1 else 100
                             
-                            print(f"[{symbol}] Synthetic setup found! Stake: ${chosen_stake} ({chosen_multiplier}x)")
+                            print(f"[{symbol}] Firing simultaneous order! Stake: ${chosen_stake}")
                             
                             proposal_request = {
                                 "proposal": 1,
@@ -66,13 +55,14 @@ async def trade_worker(symbol):
                                 "currency": "USD",
                                 "symbol": symbol,
                                 "multiplier": chosen_multiplier,
+                                "req_id": random.randint(2001, 5000),
                                 "limit_order": {
                                     "stop_loss": round(chosen_stake * 0.5, 2),
                                     "take_profit": round(chosen_stake * 1.0, 2)
                                 }
                             }
                             await ws.send(json.dumps(proposal_request))
-                            await asyncio.sleep(8)
+                            await asyncio.sleep(6) # Faster cycling
                             
                     elif msg_type == "proposal":
                         if "proposal" in data:
@@ -80,15 +70,16 @@ async def trade_worker(symbol):
                             payout = data["proposal"]["ask_price"]
                             buy_request = {
                                 "buy": proposal_id,
-                                "price": float(payout) + 2
+                                "price": float(payout) + 2,
+                                "req_id": random.randint(5001, 9999)
                             }
                             await ws.send(json.dumps(buy_request))
                             
                     elif msg_type == "buy":
                         if "buy" in data:
                             contract_id = data["buy"]["contract_id"]
-                            active_contracts[contract_id] = 1000.00
-                            print(f"[{symbol}] SUCCESS! Synthetic position live! ID: {contract_id}")
+                            active_contracts[contract_id] = True
+                            print(f"[{symbol}] MULTI-TRADE SUCCESS! Active ID: {contract_id}")
 
         except Exception as e:
             print(f"[{symbol}] Reconnecting due to: {e}")
