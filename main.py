@@ -1,7 +1,6 @@
 import asyncio
 import websockets
 import json
-import random
 import os
 from flask import Flask
 import threading
@@ -10,16 +9,15 @@ app = Flask(__name__)
 
 @app.route('/')
 def home():
-    return "Divine Gold Bot is running!"
+    return "Gold Bot is active!"
 
 def run_web():
     port = int(os.environ.get("PORT", 10000))
     app.run(host='0.0.0.0', port=port)
 
-# The bot pulls your token securely from Render environment variables
 API_TOKEN = os.environ.get("DERIV_TOKEN", "")
 APP_ID = "1089"
-TARGET_SYMBOL = "R_75" 
+TARGET_SYMBOL = "frxXAUUSD" # Deriv API symbol for Gold
 
 async def run_bot():
     ws_url = f"wss://ws.derivws.com/websockets/v3?app_id={APP_ID}"
@@ -28,13 +26,13 @@ async def run_bot():
     while True:
         try:
             if not API_TOKEN:
-                print("ERROR: DERIV_TOKEN is missing on Render environment! Please add it.")
+                print("ERROR: DERIV_TOKEN is missing on Render environment!")
                 await asyncio.sleep(10)
                 continue
 
-            print("Connecting to Deriv WebSocket and authorizing...")
+            print("Connecting to Deriv for Gold (XAUUSD)...")
             async with websockets.connect(ws_url) as ws:
-                # Authorize first (Required for multipliers)
+                # Authorize session
                 await ws.send(json.dumps({"authorize": API_TOKEN, "req_id": 1}))
                 auth_res = await ws.recv()
                 auth_data = json.loads(auth_res)
@@ -44,7 +42,7 @@ async def run_bot():
                     await asyncio.sleep(10)
                     continue
 
-                print("Authorized successfully! Subscribing to ticks...")
+                print("Authorized! Subscribing to Gold ticks...")
                 await ws.send(json.dumps({"ticks": TARGET_SYMBOL, "req_id": 2}))
                 
                 async for message in ws:
@@ -53,26 +51,23 @@ async def run_bot():
                     
                     if msg_type == "tick":
                         price = data.get("tick", {}).get("quote")
-                        print(f"-> Live Price [{TARGET_SYMBOL}]: {price}")
+                        print(f"-> Gold Price: {price}")
                         
-                        # Bot automatically chooses its own stake/lot size
+                        # Place a standard Call (Rise) option contract on Gold (No Multipliers)
                         if not traded:
                             traded = True
-                            chosen_stake = random.choice([1, 2]) # Bot picks stake automatically
-                            print(f"Bot choosing stake size: ${chosen_stake}. Sending trade proposal...")
+                            chosen_stake = 1
+                            print(f"Sending Gold Rise contract proposal (Stake: ${chosen_stake})...")
                             
                             proposal_payload = {
                                 "proposal": 1,
                                 "amount": chosen_stake,
                                 "basis": "stake",
-                                "contract_type": "MULTUP",
+                                "contract_type": "CALL", # Standard Rise option
                                 "currency": "USD",
                                 "symbol": TARGET_SYMBOL,
-                                "multiplier": 20,
-                                "limit_order": {
-                                    "stop_loss": 0.50,
-                                    "take_profit": 0.80
-                                },
+                                "duration": 5,
+                                "duration_unit": "t", # 5 ticks duration
                                 "req_id": 3
                             }
                             await ws.send(json.dumps(proposal_payload))
@@ -81,7 +76,7 @@ async def run_bot():
                         if "proposal" in data and "error" not in data:
                             proposal_id = data["proposal"]["id"]
                             ask_price = data["proposal"]["ask_price"]
-                            print(f"Proposal received! Buying contract at price {ask_price}...")
+                            print(f"Proposal received! Buying Gold contract at price {ask_price}...")
                             buy_payload = {
                                 "buy": proposal_id,
                                 "price": float(ask_price),
@@ -94,7 +89,7 @@ async def run_bot():
                     elif msg_type == "buy":
                         if "buy" in data:
                             contract_id = data["buy"]["contract_id"]
-                            print(f"SUCCESS! Trade opened successfully! ID: {contract_id}")
+                            print(f"SUCCESS! Gold contract opened! ID: {contract_id}")
 
         except Exception as e:
             print(f"Connection error: {e}")
