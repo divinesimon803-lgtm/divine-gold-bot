@@ -10,14 +10,14 @@ app = Flask(__name__)
 
 @app.route('/')
 def home():
-    return "Divine Gold Bot is active!"
+    return "Divine Configurable Bot is active!"
 
 def run_web():
     port = int(os.environ.get("PORT", 10000))
     app.run(host='0.0.0.0', port=port)
 
-# Your token configured here
-API_TOKEN = "pat_6036c31325ed08501f5943ce14fd62458d7e32903df17c1afe7ef8928bd8b1f3"
+# Automatically pulls whichever token you put in Render's Environment settings
+API_TOKEN = os.environ.get("DERIV_TOKEN", "")
 APP_ID = "1089"
 TARGET_SYMBOL = "R_75" 
 
@@ -26,10 +26,14 @@ async def multi_position_worker():
     active_contracts = {}
 
     while True:
+        if not API_TOKEN:
+            print("ERROR: DERIV_TOKEN environment variable is missing on Render!")
+            await asyncio.sleep(15)
+            continue
+
         try:
             print(f"Connecting to Deriv WebSocket for {TARGET_SYMBOL}...")
             async with websockets.connect(ws_url) as ws:
-                # 1. Authorize connection
                 auth_payload = {"authorize": API_TOKEN, "req_id": 1}
                 await ws.send(json.dumps(auth_payload))
                 auth_response = await ws.recv()
@@ -37,13 +41,11 @@ async def multi_position_worker():
                 
                 if "error" in auth_data:
                     print(f"AUTHORIZATION FAILED: {auth_data['error']['message']}")
-                    print("NOTE: Make sure this token matches the account type (Demo vs Real) you are using!")
+                    print("Check if your token matches the Demo/Real account you intend to use.")
                     await asyncio.sleep(10)
                     continue
                 
                 print("Authorized successfully! Subscribing to ticks...")
-                
-                # 2. Subscribe to ticks
                 await ws.send(json.dumps({"ticks": TARGET_SYMBOL, "req_id": 2}))
                 
                 async for message in ws:
