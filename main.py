@@ -10,89 +10,41 @@ app = Flask(__name__)
 
 @app.route('/')
 def home():
-    return "Divine Gold Bot is active!"
+    return "Divine Unauthenticated Bot is active!"
 
 def run_web():
     port = int(os.environ.get("PORT", 10000))
     app.run(host='0.0.0.0', port=port)
 
-# Your brand new token configured here
-API_TOKEN = "pat_50a8ece94a33d9a1da08e00652a7586ce90cdaa4780682d84acfee7d0c0a540f"
 APP_ID = "1089"
 TARGET_SYMBOL = "R_75" 
 
-async def multi_position_worker():
+async def public_market_worker():
     ws_url = f"wss://ws.derivws.com/websockets/v3?app_id={APP_ID}"
-    active_contracts = {}
 
     while True:
         try:
-            print(f"Connecting to Deriv WebSocket for {TARGET_SYMBOL}...")
+            print(f"Connecting to Deriv Public Feed for {TARGET_SYMBOL}...")
             async with websockets.connect(ws_url) as ws:
-                auth_payload = {"authorize": API_TOKEN}
-                await ws.send(json.dumps(auth_payload))
-                auth_response = await ws.recv()
-                auth_data = json.loads(auth_response)
-                
-                if "error" in auth_data:
-                    print(f"DERIV AUTH ERROR: {auth_data['error']['message']} (Code: {auth_data['error'].get('code')})")
-                    await asyncio.sleep(15)
-                    continue
-                
-                print("Authorized successfully! Subscribing to ticks...")
-                await ws.send(json.dumps({"ticks": TARGET_SYMBOL}))
+                # Skip authorization entirely and subscribe straight to ticks
+                print("Subscribing directly to market ticks...")
+                await ws.send(json.dumps({"ticks": TARGET_SYMBOL, "req_id": 1}))
                 
                 async for message in ws:
                     data = json.loads(message)
                     msg_type = data.get("msg_type")
                     
                     if msg_type == "tick":
-                        print(f"Tick received for {TARGET_SYMBOL}. Evaluating trade...")
-                        if random.random() < 0.6 and len(active_contracts) < 4:
-                            chosen_stake = random.choice([1, 2])
-                            chosen_multiplier = 50
-                            
-                            proposal_request = {
-                                "proposal": 1,
-                                "amount": chosen_stake,
-                                "basis": "stake",
-                                "contract_type": "MULTUP",
-                                "currency": "USD",
-                                "symbol": TARGET_SYMBOL,
-                                "multiplier": chosen_multiplier,
-                                "limit_order": {
-                                    "stop_loss": round(chosen_stake * 0.5, 2),
-                                    "take_profit": round(chosen_stake * 1.0, 2)
-                                }
-                            }
-                            await ws.send(json.dumps(proposal_request))
-                            await asyncio.sleep(4)
-                            
-                    elif msg_type == "proposal":
-                        if "proposal" in data and "error" not in data:
-                            proposal_id = data["proposal"]["id"]
-                            payout = data["proposal"]["ask_price"]
-                            print(f"Proposal received. Buying contract...")
-                            buy_request = {
-                                "buy": proposal_id,
-                                "price": float(payout) + 2
-                            }
-                            await ws.send(json.dumps(buy_request))
-                        elif "error" in data:
-                            print(f"Proposal Error: {data['error']['message']}")
-                            
-                    elif msg_type == "buy":
-                        if "buy" in data:
-                            contract_id = data["buy"]["contract_id"]
-                            active_contracts[contract_id] = True
-                            print(f"SUCCESS! Position live! ID: {contract_id}")
-
+                        tick_data = data.get("tick", {})
+                        price = tick_data.get("quote")
+                        print(f"SUCCESS! Live Tick received for {TARGET_SYMBOL} -> Price: {price}")
+                        
         except Exception as e:
             print(f"Connection Exception: {e}")
             await asyncio.sleep(5)
 
 async def main():
-    await multi_position_worker()
+    await public_market_worker()
 
 if __name__ == "__main__":
     t = threading.Thread(target=run_web)
