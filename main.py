@@ -10,7 +10,7 @@ app = Flask(__name__)
 
 @app.route('/')
 def home():
-    return "Divine Pro Multi-Market Bot is active!"
+    return "Divine Synthetic 24/7 Matrix Bot is active!"
 
 def run_web():
     port = int(os.environ.get("PORT", 10000))
@@ -19,7 +19,8 @@ def run_web():
 API_TOKEN = "pat_9ea5fd57fa2cfc960e7c30d0f7a737d559dc6dc258dcf572d32bae26999092e8"
 APP_ID = "1089"
 
-SYMBOLS = ["frxXAUUSD", "frxEURUSD", "frxGBPUSD", "frxAUDUSD"]
+# High-volatility synthetic indices that trade 24/7/365 without weekend or night closures
+SYMBOLS = ["R_75", "R_100", "1HZ100V", "R_50"]
 
 async def trade_worker(symbol):
     ws_url = f"wss://ws.derivws.com/websockets/v3?app_id={APP_ID}"
@@ -32,7 +33,7 @@ async def trade_worker(symbol):
                 await ws.send(json.dumps(auth_payload))
                 await ws.recv()
                 
-                print(f"[{symbol}] Connected & Authorized. Ready for multi-trades...")
+                print(f"[{symbol}] Connected & Authorized. Scanning synthetic volatility...")
                 await ws.send(json.dumps({"ticks": symbol}))
                 
                 async for message in ws:
@@ -43,20 +44,20 @@ async def trade_worker(symbol):
                         tick_data = data.get("tick", {})
                         current_price = tick_data.get("quote")
                         
-                        # Only exit early on extreme emergency reversals; otherwise, let TP/SL handle it naturally
+                        # Emergency spike check for synthetic trends
                         for cid, entry_price in list(active_contracts.items()):
-                            if abs(current_price - entry_price) > (entry_price * 0.003): # Wider tolerance so TP can be reached
-                                print(f"[{symbol}] Severe spike detected, cutting position {cid} early.")
+                            if abs(current_price - entry_price) > (entry_price * 0.005):
+                                print(f"[{symbol}] Spike detected, cutting contract {cid} early.")
                                 close_request = {"sell": cid, "price": 0}
                                 await ws.send(json.dumps(close_request))
                                 del active_contracts[cid]
 
-                        # Allow multiple trades concurrently across the symbols
-                        if random.random() < 0.35 and len(active_contracts) < 4:
+                        # Frequent entry trigger for rapid compounding
+                        if random.random() < 0.4 and len(active_contracts) < 4:
                             chosen_stake = random.choice([1, 2, 3])
                             chosen_multiplier = 50 if chosen_stake == 1 else 100
                             
-                            print(f"[{symbol}] Multi-trade setup! Stake: ${chosen_stake} ({chosen_multiplier}x)")
+                            print(f"[{symbol}] Synthetic setup found! Stake: ${chosen_stake} ({chosen_multiplier}x)")
                             
                             proposal_request = {
                                 "proposal": 1,
@@ -72,7 +73,7 @@ async def trade_worker(symbol):
                                 }
                             }
                             await ws.send(json.dumps(proposal_request))
-                            await asyncio.sleep(12)
+                            await asyncio.sleep(10)
                             
                     elif msg_type == "proposal":
                         if "proposal" in data:
@@ -87,8 +88,8 @@ async def trade_worker(symbol):
                     elif msg_type == "buy":
                         if "buy" in data:
                             contract_id = data["buy"]["contract_id"]
-                            active_contracts[contract_id] = 1.1500
-                            print(f"[{symbol}] SUCCESS! Position running to TP! ID: {contract_id}")
+                            active_contracts[contract_id] = 1000.00 # baseline reference
+                            print(f"[{symbol}] SUCCESS! Synthetic position live! ID: {contract_id}")
 
         except Exception as e:
             print(f"[{symbol}] Reconnecting due to: {e}")
@@ -96,7 +97,9 @@ async def trade_worker(symbol):
 
 async def main():
     workers = [trade_worker(symbol) for symbol in SYMBOLS]
-    await asyncio.gather(*workers)
+    asyncio.gather(*workers)
+    while True:
+        await asyncio.sleep(3600)
 
 if __name__ == "__main__":
     t = threading.Thread(target=run_web)
