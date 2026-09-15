@@ -10,7 +10,7 @@ app = Flask(__name__)
 
 @app.route('/')
 def home():
-    return "Divine Single-Asset Matrix Bot is active!"
+    return "Divine Debug Bot is active!"
 
 def run_web():
     port = int(os.environ.get("PORT", 10000))
@@ -18,8 +18,6 @@ def run_web():
 
 API_TOKEN = "pat_9ea5fd57fa2cfc960e7c30d0f7a737d559dc6dc258dcf572d32bae26999092e8"
 APP_ID = "1089"
-
-# Target asset symbol (Change to your preferred symbol, e.g., "R_75" for 24/7 synthetic or "frxXAUUSD" for gold)
 TARGET_SYMBOL = "R_75" 
 
 async def multi_position_worker():
@@ -28,12 +26,20 @@ async def multi_position_worker():
 
     while True:
         try:
+            print(f"Connecting to Deriv WebSocket for {TARGET_SYMBOL}...")
             async with websockets.connect(ws_url) as ws:
                 # 1. Authorize connection
                 auth_payload = {"authorize": API_TOKEN, "req_id": 1}
                 await ws.send(json.dumps(auth_payload))
                 auth_response = await ws.recv()
-                print("Connected & Authorized successfully.")
+                auth_data = json.loads(auth_response)
+                
+                if "error" in auth_data:
+                    print(f"AUTHORIZATION FAILED: {auth_data['error']['message']}")
+                    await asyncio.sleep(10)
+                    continue
+                
+                print("Authorized successfully! Subscribing to ticks...")
                 
                 # 2. Subscribe to ticks
                 await ws.send(json.dumps({"ticks": TARGET_SYMBOL, "req_id": 2}))
@@ -43,19 +49,10 @@ async def multi_position_worker():
                     msg_type = data.get("msg_type")
                     
                     if msg_type == "tick":
-                        tick_data = data.get("tick", {})
-                        current_price = tick_data.get("quote")
-                        
-                        # Monitor active positions and clear closed ones
-                        if len(active_contracts) > 0:
-                            print(f"Active positions running: {list(active_contracts.keys())}")
-
-                        # Trigger multiple independent positions (up to 4 active at once)
+                        print(f"Tick received for {TARGET_SYMBOL}. Evaluating trade...")
                         if random.random() < 0.6 and len(active_contracts) < 4:
                             chosen_stake = random.choice([1, 2])
                             chosen_multiplier = 50
-                            
-                            print(f"[{TARGET_SYMBOL}] Opening new position! Stake: ${chosen_stake}")
                             
                             proposal_request = {
                                 "proposal": 1,
@@ -72,12 +69,13 @@ async def multi_position_worker():
                                 }
                             }
                             await ws.send(json.dumps(proposal_request))
-                            await asyncio.sleep(4) # Pacing between orders
+                            await asyncio.sleep(4)
                             
                     elif msg_type == "proposal":
                         if "proposal" in data and "error" not in data:
                             proposal_id = data["proposal"]["id"]
                             payout = data["proposal"]["ask_price"]
+                            print(f"Proposal received. Buying contract...")
                             buy_request = {
                                 "buy": proposal_id,
                                 "price": float(payout) + 2,
@@ -94,7 +92,7 @@ async def multi_position_worker():
                             print(f"SUCCESS! Position live! ID: {contract_id}")
 
         except Exception as e:
-            print(f"Reconnecting due to error: {e}")
+            print(f"Connection Exception: {e}")
             await asyncio.sleep(5)
 
 async def main():
