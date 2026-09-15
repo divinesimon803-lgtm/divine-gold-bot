@@ -17,8 +17,8 @@ def run_web():
 API_TOKEN = "pat_9ea5fd57fa2cfc960e7c30d0f7a737d559dc6dc258dcf572d32bae26999092e8"
 APP_ID = "1089" 
 
-# Markets to trade: Gold is main, plus currency pairs
 SYMBOLS = ["frxXAUUSD", "frxEURUSD", "frxGBPUSD", "frxAUDUSD"]
+last_trade_times = {symbol: 0 for symbol in SYMBOLS}
 
 def on_open(ws):
     print("Connected to Deriv API successfully!")
@@ -26,6 +26,7 @@ def on_open(ws):
     ws.send(json.dumps(auth_data))
 
 def on_message(ws, message):
+    global last_trade_times
     data = json.loads(message)
     msg_type = data.get("msg_type")
     
@@ -33,15 +34,17 @@ def on_message(ws, message):
         print("Authorization Successful! Subscribing to multi-market feeds...")
         for symbol in SYMBOLS:
             ws.send(json.dumps({"ticks": symbol}))
-            time.sleep(0.5)
+            time.sleep(0.3)
             
     elif msg_type == "tick":
         tick_data = data.get("tick", {})
         symbol = tick_data.get("symbol")
         quote = tick_data.get("quote")
         
-        # Random trigger to spread trades across different markets dynamically
-        if random.random() < 0.25: 
+        current_time = time.time()
+        # Check each symbol independently every 15 seconds for multi-market spread
+        if symbol in last_trade_times and (current_time - last_trade_times[symbol] > 15):
+            
             chosen_stake = random.choice([1, 2, 3])
             chosen_multiplier = 50 if chosen_stake == 1 else 100
             
@@ -61,6 +64,7 @@ def on_message(ws, message):
                 }
             }
             ws.send(json.dumps(proposal_request))
+            last_trade_times[symbol] = current_time
             
     elif msg_type == "proposal":
         if "proposal" in data:
