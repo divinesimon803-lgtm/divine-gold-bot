@@ -31,7 +31,6 @@ def on_message(ws, message):
     
     if msg_type == "authorize":
         print("Authorization Successful! Subscribing to multi-market feeds...")
-        # Subscribe to ticks for all configured symbols at once
         for symbol in SYMBOLS:
             ws.send(json.dumps({"ticks": symbol}))
             time.sleep(0.5)
@@ -73,7 +72,7 @@ def on_message(ws, message):
             
     elif msg_type == "buy":
         if "buy" in data:
-            contract_id = data["buy"]["contract_id']" if False else data["buy"]["contract_id"]
+            contract_id = data["buy"]["contract_id"]
             print(f"SUCCESS! Position opened! Contract ID: {contract_id}")
         elif "error" in data:
             print(f"Trade Execution Error: {data['error']['message']}")
