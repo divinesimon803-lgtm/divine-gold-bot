@@ -37,28 +37,30 @@ async def trading_worker():
                     if msg_type == "tick":
                         tick_data = data.get("tick", {})
                         price = tick_data.get("quote")
-                        print(f"Tick received for {TARGET_SYMBOL} -> Price: {price}. Evaluating trade...")
                         
-                        if random.random() < 0.5 and len(active_contracts) < 3:
-                            chosen_stake = 1
-                            proposal_request = {
-                                "proposal": 1,
-                                "amount": chosen_stake,
-                                "basis": "stake",
-                                "contract_type": "MULTUP",
-                                "currency": "USD",
-                                "symbol": TARGET_SYMBOL,
-                                "multiplier": 20, # Adjusted multiplier for stability
-                                "req_id": random.randint(100, 999)
-                            }
-                            await ws.send(json.dumps(proposal_request))
-                            await asyncio.sleep(6)
+                        if price:
+                            print(f"Live Price [{TARGET_SYMBOL}]: {price} | Evaluating trade...")
+                            
+                            # 50% chance trigger with max 3 concurrent positions
+                            if random.random() < 0.5 and len(active_contracts) < 3:
+                                proposal_request = {
+                                    "proposal": 1,
+                                    "amount": 1,
+                                    "basis": "stake",
+                                    "contract_type": "MULTUP",
+                                    "currency": "USD",
+                                    "symbol": TARGET_SYMBOL,
+                                    "multiplier": 20,
+                                    "req_id": random.randint(100, 999)
+                                }
+                                await ws.send(json.dumps(proposal_request))
+                                await asyncio.sleep(5)
                             
                     elif msg_type == "proposal":
                         if "proposal" in data and "error" not in data:
                             proposal_id = data["proposal"]["id"]
                             ask_price = data["proposal"]["ask_price"]
-                            print(f"Proposal received successfully. Buying contract...")
+                            print(f"Proposal received (Cost: {ask_price}). Buying contract...")
                             buy_request = {
                                 "buy": proposal_id,
                                 "price": float(ask_price),
