@@ -10,7 +10,7 @@ app = Flask(__name__)
 
 @app.route('/')
 def home():
-    return "Divine Advanced Multi-Market Bot is active!"
+    return "Divine Pro Multi-Market Bot is active!"
 
 def run_web():
     port = int(os.environ.get("PORT", 10000))
@@ -23,7 +23,7 @@ SYMBOLS = ["frxXAUUSD", "frxEURUSD", "frxGBPUSD", "frxAUDUSD"]
 
 async def trade_worker(symbol):
     ws_url = f"wss://ws.derivws.com/websockets/v3?app_id={APP_ID}"
-    active_contracts = {} # Tracks open contract IDs and their entry quotes
+    active_contracts = {}
 
     while True:
         try:
@@ -32,7 +32,7 @@ async def trade_worker(symbol):
                 await ws.send(json.dumps(auth_payload))
                 await ws.recv()
                 
-                print(f"[{symbol}] Connected & Authorized. Monitoring market...")
+                print(f"[{symbol}] Connected & Authorized. Ready for multi-trades...")
                 await ws.send(json.dumps({"ticks": symbol}))
                 
                 async for message in ws:
@@ -43,21 +43,20 @@ async def trade_worker(symbol):
                         tick_data = data.get("tick", {})
                         current_price = tick_data.get("quote")
                         
-                        # 1. Reversal Check for open positions: if price moves against us sharply, close early
+                        # Only exit early on extreme emergency reversals; otherwise, let TP/SL handle it naturally
                         for cid, entry_price in list(active_contracts.items()):
-                            # Simple reversal detection logic (e.g. if price shifts significantly against entry)
-                            if abs(current_price - entry_price) > (entry_price * 0.0015):
-                                print(f"[{symbol}] Reversal detected! Closing contract {cid} early to protect capital.")
+                            if abs(current_price - entry_price) > (entry_price * 0.003): # Wider tolerance so TP can be reached
+                                print(f"[{symbol}] Severe spike detected, cutting position {cid} early.")
                                 close_request = {"sell": cid, "price": 0}
                                 await ws.send(json.dumps(close_request))
                                 del active_contracts[cid]
 
-                        # 2. Frequent entry trigger for multiple simultaneous positions
-                        if random.random() < 0.4 and len(active_contracts) < 3:
+                        # Allow multiple trades concurrently across the symbols
+                        if random.random() < 0.35 and len(active_contracts) < 4:
                             chosen_stake = random.choice([1, 2, 3])
                             chosen_multiplier = 50 if chosen_stake == 1 else 100
                             
-                            print(f"[{symbol}] Opening setup! Stake: ${chosen_stake} ({chosen_multiplier}x)")
+                            print(f"[{symbol}] Multi-trade setup! Stake: ${chosen_stake} ({chosen_multiplier}x)")
                             
                             proposal_request = {
                                 "proposal": 1,
@@ -73,7 +72,7 @@ async def trade_worker(symbol):
                                 }
                             }
                             await ws.send(json.dumps(proposal_request))
-                            await asyncio.sleep(8) # Shorter cooldown to allow multiple trades
+                            await asyncio.sleep(12)
                             
                     elif msg_type == "proposal":
                         if "proposal" in data:
@@ -88,16 +87,11 @@ async def trade_worker(symbol):
                     elif msg_type == "buy":
                         if "buy" in data:
                             contract_id = data["buy"]["contract_id"]
-                            # Store contract with a baseline dummy price for reversal tracking
-                            active_contracts[contract_id] = 1.1500 
-                            print(f"[{symbol}] SUCCESS! Multi-position active! ID: {contract_id}")
-                            
-                    elif msg_type == "sell":
-                        if "sell" in data:
-                            print(f"[{symbol}] Position successfully closed early due to reversal signal.")
+                            active_contracts[contract_id] = 1.1500
+                            print(f"[{symbol}] SUCCESS! Position running to TP! ID: {contract_id}")
 
         except Exception as e:
-            print(f"[{symbol}] Connection error: {e}. Reconnecting...")
+            print(f"[{symbol}] Reconnecting due to: {e}")
             await asyncio.sleep(5)
 
 async def main():
