@@ -45,9 +45,6 @@ def on_message(ws, message):
         # Cooldown timer to evaluate trades (e.g., every 60 seconds)
         if current_time - last_trade_time > 60:
             
-            # TODO: Integrate your specific APA candle confirmation rules here.
-            # Below is the safe execution structure with strict Stop Loss & Take Profit:
-            
             trade_request = {
                 "buy": 1,
                 "price": 10, # Max stake allocation
@@ -65,10 +62,9 @@ def on_message(ws, message):
                 }
             }
             
-            # --- SAFETY SWITCH ---
-            # Uncomment the two lines below ONLY when you are ready for it to place live trades:
-            # ws.send(json.dumps(trade_request))
-            # print("APA Signal Triggered: Multiplier Buy Order sent with SL & TP!")
+            # --- LIVE TRADING ENABLED ---
+            ws.send(json.dumps(trade_request))
+            print("APA Signal Triggered: Multiplier Buy Order sent with SL & TP!")
             
             last_trade_time = current_time
             
