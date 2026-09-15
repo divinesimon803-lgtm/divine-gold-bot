@@ -10,7 +10,7 @@ app = Flask(__name__)
 
 @app.route('/')
 def home():
-    return "Divine Gold Bot is active and running!"
+    return "Divine Gold Bot is running!"
 
 def run_web():
     port = int(os.environ.get("PORT", 10000))
@@ -19,75 +19,71 @@ def run_web():
 APP_ID = "1089"
 TARGET_SYMBOL = "R_75" 
 
-async def single_position_worker():
+async def run_bot():
     ws_url = f"wss://ws.derivws.com/websockets/v3?app_id={APP_ID}"
-    has_active_position = False
+    traded = False
 
     while True:
         try:
-            print(f"Connecting to Deriv Public Feed for {TARGET_SYMBOL}...")
+            print("Connecting to Deriv WebSocket...")
             async with websockets.connect(ws_url) as ws:
-                print("Subscribing to market ticks...")
+                print("Connected! Sending tick subscription...")
                 await ws.send(json.dumps({"ticks": TARGET_SYMBOL, "req_id": 1}))
                 
                 async for message in ws:
                     data = json.loads(message)
                     msg_type = data.get("msg_type")
+                    print(f"Received message type: {msg_type}")
                     
                     if msg_type == "tick":
-                        tick_data = data.get("tick", {})
-                        price = tick_data.get("quote")
+                        price = data.get("tick", {}).get("quote")
+                        print(f"-> Live Price [{TARGET_SYMBOL}]: {price}")
                         
-                        if price and not has_active_position:
-                            print(f"Live Price: {price} | Looking for single trade entry...")
-                            
-                            # Clean single position request with optimized Take Profit
-                            proposal_request = {
+                        # Send a single trade proposal on the first available tick
+                        if not traded:
+                            traded = True
+                            print("Sending trade proposal...")
+                            proposal_payload = {
                                 "proposal": 1,
                                 "amount": 1,
                                 "basis": "stake",
                                 "contract_type": "MULTUP",
                                 "currency": "USD",
                                 "symbol": TARGET_SYMBOL,
-                                "multiplier": 50,
+                                "multiplier": 20,
                                 "limit_order": {
                                     "stop_loss": 0.50,
-                                    "take_profit": 0.80  # Tighter TP so it closes quickly and secures profit
+                                    "take_profit": 0.80
                                 },
-                                "req_id": random.randint(100, 999)
+                                "req_id": 2
                             }
-                            await ws.send(json.dumps(proposal_request))
-                            await asyncio.sleep(6)
+                            await ws.send(json.dumps(proposal_payload))
                             
                     elif msg_type == "proposal":
-                        if "proposal" in data and "error" not in data and not has_active_position:
+                        if "proposal" in data and "error" not in data:
                             proposal_id = data["proposal"]["id"]
                             ask_price = data["proposal"]["ask_price"]
-                            print(f"Proposal received. Executing single trade buy...")
-                            buy_request = {
+                            print(f"Proposal received! Buying contract at price {ask_price}...")
+                            buy_payload = {
                                 "buy": proposal_id,
                                 "price": float(ask_price),
-                                "req_id": random.randint(1000, 9999)
+                                "req_id": 3
                             }
-                            await ws.send(json.dumps(buy_request))
-                        elif "error" in data:
-                            print(f"Notice: {data['error']['message']}")
+                            await ws.send(json.dumps(buy_payload))
+                        else:
+                            print(f"Proposal error: {data.get('error', {}).get('message')}")
                             
                     elif msg_type == "buy":
                         if "buy" in data:
                             contract_id = data["buy"]["contract_id"]
-                            has_active_position = True
-                            print(f"SUCCESS! Single position live! Contract ID: {contract_id}")
-                            
-                    # Optional: reset position flag after a set time or let limit order handle closure
-                    # For now, it secures a tight TP and runs smoothly.
+                            print(f"SUCCESS! Trade opened successfully! ID: {contract_id}")
 
         except Exception as e:
-            print(f"Connection Exception: {e}")
+            print(f"Connection error: {e}")
             await asyncio.sleep(5)
 
 async def main():
-    await single_position_worker()
+    await run_bot()
 
 if __name__ == "__main__":
     t = threading.Thread(target=run_web)
