@@ -10,7 +10,7 @@ app = Flask(__name__)
 
 @app.route('/')
 def home():
-    return "Divine Gold Bot is actively trading!"
+    return "Divine Gold Bot is active!"
 
 def run_web():
     port = int(os.environ.get("PORT", 10000))
@@ -39,11 +39,8 @@ async def trading_worker():
                         price = tick_data.get("quote")
                         print(f"Tick received for {TARGET_SYMBOL} -> Price: {price}. Evaluating trade...")
                         
-                        # Open positions while under the 4-position limit
-                        if random.random() < 0.6 and len(active_contracts) < 4:
-                            chosen_stake = random.choice([1, 2])
-                            chosen_multiplier = 50
-                            
+                        if random.random() < 0.5 and len(active_contracts) < 3:
+                            chosen_stake = 1
                             proposal_request = {
                                 "proposal": 1,
                                 "amount": chosen_stake,
@@ -51,24 +48,20 @@ async def trading_worker():
                                 "contract_type": "MULTUP",
                                 "currency": "USD",
                                 "symbol": TARGET_SYMBOL,
-                                "multiplier": chosen_multiplier,
-                                "req_id": random.randint(100, 999),
-                                "limit_order": {
-                                    "stop_loss": round(chosen_stake * 0.5, 2),
-                                    "take_profit": round(chosen_stake * 1.0, 2)
-                                }
+                                "multiplier": 20, # Adjusted multiplier for stability
+                                "req_id": random.randint(100, 999)
                             }
                             await ws.send(json.dumps(proposal_request))
-                            await asyncio.sleep(4)
+                            await asyncio.sleep(6)
                             
                     elif msg_type == "proposal":
                         if "proposal" in data and "error" not in data:
                             proposal_id = data["proposal"]["id"]
-                            payout = data["proposal"]["ask_price"]
-                            print(f"Proposal received. Buying contract...")
+                            ask_price = data["proposal"]["ask_price"]
+                            print(f"Proposal received successfully. Buying contract...")
                             buy_request = {
                                 "buy": proposal_id,
-                                "price": float(payout) + 2,
+                                "price": float(ask_price),
                                 "req_id": random.randint(1000, 9999)
                             }
                             await ws.send(json.dumps(buy_request))
