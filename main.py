@@ -19,7 +19,6 @@ def run_web():
 API_TOKEN = "pat_9ea5fd57fa2cfc960e7c30d0f7a737d559dc6dc258dcf572d32bae26999092e8"
 APP_ID = "1089"
 
-# High-volatility synthetic indices that trade 24/7/365 without weekend or night closures
 SYMBOLS = ["R_75", "R_100", "1HZ100V", "R_50"]
 
 async def trade_worker(symbol):
@@ -44,7 +43,7 @@ async def trade_worker(symbol):
                         tick_data = data.get("tick", {})
                         current_price = tick_data.get("quote")
                         
-                        # Emergency spike check for synthetic trends
+                        # Emergency spike check
                         for cid, entry_price in list(active_contracts.items()):
                             if abs(current_price - entry_price) > (entry_price * 0.005):
                                 print(f"[{symbol}] Spike detected, cutting contract {cid} early.")
@@ -52,8 +51,8 @@ async def trade_worker(symbol):
                                 await ws.send(json.dumps(close_request))
                                 del active_contracts[cid]
 
-                        # Frequent entry trigger for rapid compounding
-                        if random.random() < 0.4 and len(active_contracts) < 4:
+                        # Frequent entry trigger for multi-positions
+                        if random.random() < 0.45 and len(active_contracts) < 4:
                             chosen_stake = random.choice([1, 2, 3])
                             chosen_multiplier = 50 if chosen_stake == 1 else 100
                             
@@ -73,7 +72,7 @@ async def trade_worker(symbol):
                                 }
                             }
                             await ws.send(json.dumps(proposal_request))
-                            await asyncio.sleep(10)
+                            await asyncio.sleep(8)
                             
                     elif msg_type == "proposal":
                         if "proposal" in data:
@@ -88,7 +87,7 @@ async def trade_worker(symbol):
                     elif msg_type == "buy":
                         if "buy" in data:
                             contract_id = data["buy"]["contract_id"]
-                            active_contracts[contract_id] = 1000.00 # baseline reference
+                            active_contracts[contract_id] = 1000.00
                             print(f"[{symbol}] SUCCESS! Synthetic position live! ID: {contract_id}")
 
         except Exception as e:
@@ -97,9 +96,7 @@ async def trade_worker(symbol):
 
 async def main():
     workers = [trade_worker(symbol) for symbol in SYMBOLS]
-    asyncio.gather(*workers)
-    while True:
-        await asyncio.sleep(3600)
+    await asyncio.gather(*workers)
 
 if __name__ == "__main__":
     t = threading.Thread(target=run_web)
