@@ -10,14 +10,14 @@ app = Flask(__name__)
 
 @app.route('/')
 def home():
-    return "Divine Configurable Bot is active!"
+    return "Divine Gold Bot is active!"
 
 def run_web():
     port = int(os.environ.get("PORT", 10000))
     app.run(host='0.0.0.0', port=port)
 
-# Automatically pulls whichever token you put in Render's Environment settings
-API_TOKEN = os.environ.get("DERIV_TOKEN", "")
+# Your active token hardcoded to guarantee immediate authorization
+API_TOKEN = "pat_f1615c83fa02079cc2b386cad5171d62ff3b2c580165a9ffe566bbc02b1508fa"
 APP_ID = "1089"
 TARGET_SYMBOL = "R_75" 
 
@@ -26,11 +26,6 @@ async def multi_position_worker():
     active_contracts = {}
 
     while True:
-        if not API_TOKEN:
-            print("ERROR: DERIV_TOKEN environment variable is missing on Render!")
-            await asyncio.sleep(15)
-            continue
-
         try:
             print(f"Connecting to Deriv WebSocket for {TARGET_SYMBOL}...")
             async with websockets.connect(ws_url) as ws:
@@ -41,7 +36,6 @@ async def multi_position_worker():
                 
                 if "error" in auth_data:
                     print(f"AUTHORIZATION FAILED: {auth_data['error']['message']}")
-                    print("Check if your token matches the Demo/Real account you intend to use.")
                     await asyncio.sleep(10)
                     continue
                 
