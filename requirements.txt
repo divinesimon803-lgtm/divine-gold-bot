@@ -1,3 +1,2 @@
-websockets
 websocket-client
 flask
