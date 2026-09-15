@@ -16,7 +16,8 @@ def run_web():
     port = int(os.environ.get("PORT", 10000))
     app.run(host='0.0.0.0', port=port)
 
-API_TOKEN = "pat_f1615c83fa02079cc2b386cad5171d62ff3b2c580165a9ffe566bbc02b1508fa"
+# Your brand new token configured here
+API_TOKEN = "pat_50a8ece94a33d9a1da08e00652a7586ce90cdaa4780682d84acfee7d0c0a540f"
 APP_ID = "1089"
 TARGET_SYMBOL = "R_75" 
 
