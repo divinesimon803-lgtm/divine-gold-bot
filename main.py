@@ -16,6 +16,8 @@ def run_web():
     port = int(os.environ.get("PORT", 10000))
     app.run(host='0.0.0.0', port=port)
 
+# The bot pulls your token securely from Render environment variables
+API_TOKEN = os.environ.get("DERIV_TOKEN", "")
 APP_ID = "1089"
 TARGET_SYMBOL = "R_75" 
 
@@ -25,27 +27,43 @@ async def run_bot():
 
     while True:
         try:
-            print("Connecting to Deriv WebSocket...")
+            if not API_TOKEN:
+                print("ERROR: DERIV_TOKEN is missing on Render environment! Please add it.")
+                await asyncio.sleep(10)
+                continue
+
+            print("Connecting to Deriv WebSocket and authorizing...")
             async with websockets.connect(ws_url) as ws:
-                print("Connected! Sending tick subscription...")
-                await ws.send(json.dumps({"ticks": TARGET_SYMBOL, "req_id": 1}))
+                # Authorize first (Required for multipliers)
+                await ws.send(json.dumps({"authorize": API_TOKEN, "req_id": 1}))
+                auth_res = await ws.recv()
+                auth_data = json.loads(auth_res)
+
+                if "error" in auth_data:
+                    print(f"AUTH FAILED: {auth_data['error']['message']}")
+                    await asyncio.sleep(10)
+                    continue
+
+                print("Authorized successfully! Subscribing to ticks...")
+                await ws.send(json.dumps({"ticks": TARGET_SYMBOL, "req_id": 2}))
                 
                 async for message in ws:
                     data = json.loads(message)
                     msg_type = data.get("msg_type")
-                    print(f"Received message type: {msg_type}")
                     
                     if msg_type == "tick":
                         price = data.get("tick", {}).get("quote")
                         print(f"-> Live Price [{TARGET_SYMBOL}]: {price}")
                         
-                        # Send a single trade proposal on the first available tick
+                        # Bot automatically chooses its own stake/lot size
                         if not traded:
                             traded = True
-                            print("Sending trade proposal...")
+                            chosen_stake = random.choice([1, 2]) # Bot picks stake automatically
+                            print(f"Bot choosing stake size: ${chosen_stake}. Sending trade proposal...")
+                            
                             proposal_payload = {
                                 "proposal": 1,
-                                "amount": 1,
+                                "amount": chosen_stake,
                                 "basis": "stake",
                                 "contract_type": "MULTUP",
                                 "currency": "USD",
@@ -55,7 +73,7 @@ async def run_bot():
                                     "stop_loss": 0.50,
                                     "take_profit": 0.80
                                 },
-                                "req_id": 2
+                                "req_id": 3
                             }
                             await ws.send(json.dumps(proposal_payload))
                             
@@ -67,7 +85,7 @@ async def run_bot():
                             buy_payload = {
                                 "buy": proposal_id,
                                 "price": float(ask_price),
-                                "req_id": 3
+                                "req_id": 4
                             }
                             await ws.send(json.dumps(buy_payload))
                         else:
