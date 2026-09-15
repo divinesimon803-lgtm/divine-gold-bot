@@ -10,7 +10,7 @@ app = Flask(__name__)
 
 @app.route('/')
 def home():
-    return "Divine Gold Bot is active and streaming!"
+    return "Divine Gold Bot is actively trading!"
 
 def run_web():
     port = int(os.environ.get("PORT", 10000))
@@ -25,9 +25,9 @@ async def trading_worker():
 
     while True:
         try:
-            print(f"Connecting to Deriv WebSocket for {TARGET_SYMBOL}...")
+            print(f"Connecting to Deriv Public Feed for {TARGET_SYMBOL}...")
             async with websockets.connect(ws_url) as ws:
-                print("Connected! Subscribing to market ticks...")
+                print("Subscribing directly to market ticks...")
                 await ws.send(json.dumps({"ticks": TARGET_SYMBOL, "req_id": 1}))
                 
                 async for message in ws:
@@ -37,9 +37,9 @@ async def trading_worker():
                     if msg_type == "tick":
                         tick_data = data.get("tick", {})
                         price = tick_data.get("quote")
-                        print(f"Tick received -> Price: {price}. Evaluating trade...")
+                        print(f"Tick received for {TARGET_SYMBOL} -> Price: {price}. Evaluating trade...")
                         
-                        # Multi-position logic
+                        # Open positions while under the 4-position limit
                         if random.random() < 0.6 and len(active_contracts) < 4:
                             chosen_stake = random.choice([1, 2])
                             chosen_multiplier = 50
@@ -65,7 +65,7 @@ async def trading_worker():
                         if "proposal" in data and "error" not in data:
                             proposal_id = data["proposal"]["id"]
                             payout = data["proposal"]["ask_price"]
-                            print(f"Proposal received. Requesting buy...")
+                            print(f"Proposal received. Buying contract...")
                             buy_request = {
                                 "buy": proposal_id,
                                 "price": float(payout) + 2,
